@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Markdown 转 Word 友好文本 | 转换器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- 配置 Tailwind 自定义主题 -->
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#3b82f6",
+              secondary: "#6366f1",
+              neutral: {
+                100: "#f5f5f5",
+                200: "#e5e5e5",
+                300: "#d4d4d4",
+                700: "#374151",
+                800: "#1f2937",
+                900: "#111827",
+              },
+            },
+            fontFamily: {
+              inter: ["Inter", "system-ui", "sans-serif"],
+            },
+          },
+        },
+      };
+    </script>
+
+    <style type="text/tailwindcss">
+      @layer utilities {
+        .content-auto {
+          content-visibility: auto;
+        }
+        .pulse-animation {
+          animation: pulse 0.5s ease-in-out;
+        }
+        @keyframes pulse {
+          0% {
+            background-color: transparent;
+          }
+          50% {
+            background-color: rgba(59, 130, 246, 0.1);
+          }
+          100% {
+            background-color: transparent;
+          }
+        }
+        .scrollbar-thin {
+          scrollbar-width: thin;
+        }
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+          background-color: rgba(156, 163, 175, 0.5);
+          border-radius: 3px;
+        }
+        .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+          background-color: rgba(75, 85, 99, 0.5);
+        }
+      }
+    </style>
+  </head>
+
+  <body
+    class="font-inter bg-gray-50 text-neutral-800 dark:bg-neutral-900 dark:text-neutral-100 min-h-screen flex flex-col transition-colors duration-300"
+  >
+    <!-- 顶部导航栏 -->
+    <header
+      class="bg-white dark:bg-neutral-800 shadow-md sticky top-0 z-50 transition-all duration-300"
+    >
+      <div
+        class="container mx-auto px-4 py-4 flex flex-wrap items-center justify-between"
+      >
+        <div class="flex items-center space-x-2">
+          <i class="fa fa-file-text-o text-primary text-2xl"></i>
+          <h1 class="text-xl md:text-2xl font-bold">
+            <span class="text-primary">Markdown</span> 转 Word 转换器
+          </h1>
+        </div>
+
+        <div class="flex items-center mt-2 sm:mt-0">
+          <button
+            id="refresh-btn"
+            class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-700 transition-colors"
+          >
+            <i class="fa fa-refresh"></i>
+          </button>
+          <button
+            id="theme-toggle"
+            class="ml-3 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-700 transition-colors"
+          >
+            <i class="fa fa-moon-o dark:hidden"></i>
+            <i class="fa fa-sun-o hidden dark:inline-block"></i>
+          </button>
+          <button
+            id="help-btn"
+            class="ml-3 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-700 transition-colors"
+          >
+            <i class="fa fa-question-circle"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-grow container mx-auto px-4 py-6 md:py-8">
+      <!-- 介绍卡片 -->
+      <div
+        class="bg-gradient-to-r from-primary/10 to-secondary/10 dark:from-primary/20 dark:to-secondary/20 rounded-xl p-5 mb-6 shadow-sm border border-primary/10"
+      >
+        <p>
+          将 Markdown 文本转换为适合直接粘贴到 Word
+          的格式，可自定义处理规则，保留内容和结构的同时去除干扰标记。修改规则后会自动刷新结果。
+        </p>
+      </div>
+
+      <!-- 主要工作区 -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- 输入区域 -->
+        <div class="lg:col-span-1 flex flex-col h-[650px]">
+          <div
+            class="bg-white dark:bg-neutral-800 rounded-t-lg border-b border-gray-200 dark:border-neutral-700 px-4 py-3 flex justify-between items-center shadow-sm"
+          >
+            <h2 class="font-semibold flex items-center">
+              <i class="fa fa-code text-primary mr-2"></i>
+              Markdown 输入
+            </h2>
+            <div class="flex space-x-2">
+              <button
+                id="load-example"
+                class="text-sm px-3 py-1 bg-gray-100 dark:bg-neutral-700 hover:bg-gray-200 dark:hover:bg-neutral-600 rounded-md transition-colors"
+              >
+                <i class="fa fa-file-text-o mr-1"></i> 示例
+              </button>
+              <button
+                id="clear-input"
+                class="text-sm px-3 py-1 bg-gray-100 dark:bg-neutral-700 hover:bg-gray-200 dark:hover:bg-neutral-600 rounded-md transition-colors"
+              >
+                <i class="fa fa-trash-o mr-1"></i> 清空
+              </button>
+            </div>
+          </div>
+          <div
+            class="flex-grow relative border border-t-0 border-gray-200 dark:border-neutral-700 rounded-b-lg overflow-hidden"
+          >
+            <textarea
+              id="markdown-input"
+              class="w-full h-full p-4 focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none resize-none scrollbar-thin bg-white dark:bg-neutral-800"
+              placeholder="在此输入或粘贴 Markdown 文本..."
+            ></textarea>
+          </div>
+        </div>
+
+        <!-- 输出区域 -->
+        <div class="lg:col-span-1 flex flex-col h-[650px]">
+          <div
+            class="bg-white dark:bg-neutral-800 rounded-t-lg border-b border-gray-200 dark:border-neutral-700 px-4 py-3 flex justify-between items-center shadow-sm"
+          >
+            <h2 class="font-semibold flex items-center">
+              <i class="fa fa-file-word-o text-primary mr-2"></i>
+              Word 友好文本
+            </h2>
+            <button
+              id="copy-output"
+              class="text-sm px-3 py-1 bg-primary/10 text-primary hover:bg-primary/20 rounded-md transition-colors"
+            >
+              <i class="fa fa-copy mr-1"></i> 复制结果
+            </button>
+          </div>
+          <div
+            class="flex-grow relative border border-t-0 border-gray-200 dark:border-neutral-700 rounded-b-lg overflow-hidden bg-white dark:bg-neutral-800"
+          >
+            <div
+              id="word-output"
+              class="absolute inset-0 w-full h-full p-4 overflow-auto scrollbar-thin whitespace-pre-wrap font-mono text-sm"
+            ></div>
+            <div
+              id="copy-notification"
+              class="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-md shadow-md opacity-0 transition-opacity duration-300"
+            >
+              已复制到剪贴板
+            </div>
+            <div
+              id="refresh-indicator"
+              class="absolute top-4 right-4 bg-primary/80 text-white px-3 py-1 rounded-md shadow-md opacity-0 transition-opacity duration-300"
+            >
+              <i class="fa fa-refresh fa-spin mr-1"></i> 已更新
+            </div>
+          </div>
+        </div>
+
+        <!-- 规则设置侧边栏 -->
+        <div
+          class="lg:col-span-1 space-y-4 max-h-[650px] overflow-auto scrollbar-thin pr-2"
+        >
+          <div
+            class="bg-white dark:bg-neutral-800 rounded-xl shadow-sm border border-gray-200 dark:border-neutral-700 p-4"
+          >
+            <h2 class="font-semibold text-lg flex items-center mb-4">
+              <i class="fa fa-sliders text-primary mr-2"></i>
+              转换规则设置
+            </h2>
+
+            <!-- 规则组：标题处理 -->
+            <div
+              class="mb-5 pb-4 border-b border-gray-100 dark:border-neutral-700"
+            >
+              <h3 class="font-medium text-primary mb-3 flex items-center">
+                <i class="fa fa-header mr-2 text-sm"></i>1. 标题处理
+              </h3>
+              <div class="space-y-2 pl-6">
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-headers-remove"
+                    class="w-4 h-4 text-primary rounded"
+                    checked
+                  />
+                  <label for="rule-headers-remove" class="ml-2"
+                    >移除 # 号标记（# 一级标题 → 一级标题）</label
+                  >
+                </div>
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-headers-number"
+                    class="w-4 h-4 text-primary rounded"
+                    checked
+                  />
+                  <label for="rule-headers-number" class="ml-2"
+                    >将数字标题转换为中文格式（1. → 1、）</label
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- 规则组：强调文本处理 -->
+            <div
+              class="mb-5 pb-4 border-b border-gray-100 dark:border-neutral-700"
+            >
+              <h3 class="font-medium text-primary mb-3 flex items-center">
+                <i class="fa fa-bold mr-2 text-sm"></i>2. 强调文本处理
+              </h3>
+              <div class="space-y-2 pl-6">
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-remove-emphasis"
+                    class="w-4 h-4 text-primary rounded"
+                    checked
+                  />
+                  <label for="rule-remove-emphasis" class="ml-2"
+                    >移除加粗和斜体标记（**加粗** → 加粗，*斜体* → 斜体）</label
+                  >
+                </div>
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-bold-italic-priority"
+                    class="w-4 h-4 text-primary rounded"
+                    checked
+                  />
+                  <label for="rule-bold-italic-priority" class="ml-2"
+                    >优先处理加粗标记（避免与斜体冲突）</label
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- 规则组：列表处理 -->
+            <div
+              class="mb-5 pb-4 border-b border-gray-100 dark:border-neutral-700"
+            >
+              <h3 class="font-medium text-primary mb-3 flex items-center">
+                <i class="fa fa-list mr-2 text-sm"></i>3. 列表处理
+              </h3>
+              <div class="space-y-2 pl-6">
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-ul-convert"
+                    class="w-4 h-4 text-primary rounded"
+                    checked
+                  />
+                  <label for="rule-ul-convert" class="ml-2"
+                    >将无序列表转换为中文空格缩进（- 项目 → 　　项目）</label
+                  >
+                </div>
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-ol-convert"
+                    class="w-4 h-4 text-primary rounded"
+                    checked
+                  />
+                  <label for="rule-ol-convert" class="ml-2"
+                    >将有序列表转换为中文空格缩进</label
+                  >
+                </div>
+                <div class="flex items-center ml-6">
+                  <input
+                    type="checkbox"
+                    id="rule-ol-keep-number"
+                    class="w-4 h-4 text-primary rounded"
+                  />
+                  <label for="rule-ol-keep-number" class="ml-2"
+                    >保留有序列表的数字编号（1. 项目 → 　　1、项目）</label
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- 规则组：引用和代码处理 -->
+            <div
+              class="mb-5 pb-4 border-b border-gray-100 dark:border-neutral-700"
+            >
+              <h3 class="font-medium text-primary mb-3 flex items-center">
+                <i class="fa fa-quote-left mr-2 text-sm"></i>4. 引用和代码处理
+              </h3>
+              <div class="space-y-2 pl-6">
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-quote-remove"
+                    class="w-4 h-4 text-primary rounded"
+                    checked
+                  />
+                  <label for="rule-quote-remove" class="ml-2"
+                    >移除引用标记（> 引用 → 引用）</label
+                  >
+                </div>
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-code-remove"
+                    class="w-4 h-4 text-primary rounded"
+                  />
+                  <label for="rule-code-remove" class="ml-2"
+                    >移除行内代码标记（`代码` → 代码）</label
+                  >
+                </div>
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-codeblock-remove"
+                    class="w-4 h-4 text-primary rounded"
+                  />
+                  <label for="rule-codeblock-remove" class="ml-2"
+                    >移除代码块标记（```包裹的标记）</label
+                  >
+                </div>
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-code-preserve-indent"
+                    class="w-4 h-4 text-primary rounded"
+                    checked
+                    disabled
+                  />
+                  <label
+                    for="rule-code-preserve-indent"
+                    class="ml-2 text-gray-600 dark:text-gray-400"
+                    >始终保留代码块缩进（强制启用）</label
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- 规则组：链接和图片处理 -->
+            <div
+              class="mb-5 pb-4 border-b border-gray-100 dark:border-neutral-700"
+            >
+              <h3 class="font-medium text-primary mb-3 flex items-center">
+                <i class="fa fa-link mr-2 text-sm"></i>5. 链接和图片处理
+              </h3>
+              <div class="space-y-2 pl-6">
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-link-convert"
+                    class="w-4 h-4 text-primary rounded"
+                    checked
+                  />
+                  <label for="rule-link-convert" class="ml-2"
+                    >将链接转换为文本格式（[文本](url) → 文本 [链接:
+                    url]）</label
+                  >
+                </div>
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-image-remove"
+                    class="w-4 h-4 text-primary rounded"
+                    checked
+                  />
+                  <label for="rule-image-remove" class="ml-2"
+                    >移除图片标记，保留描述（![描述](url) →
+                    [图片：描述]）</label
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- 规则组：空白字符/空行处理 -->
+            <div
+              class="mb-5 pb-4 border-b border-gray-100 dark:border-neutral-700"
+            >
+              <h3 class="font-medium text-primary mb-3 flex items-center">
+                <i class="fa fa-space-shuttle mr-2 text-sm"></i>6.
+                空白字符/空行处理
+              </h3>
+              <div class="text-sm text-gray-600 dark:text-gray-400 mb-2 pl-6">
+                以下规则仅应用于非代码块内容
+              </div>
+              <div class="space-y-2 pl-6">
+                <div class="flex flex-col space-y-2">
+                  <div class="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="rule-whitespace-empty-lines"
+                      class="w-4 h-4 text-primary rounded"
+                      checked
+                    />
+                    <label for="rule-whitespace-empty-lines" class="ml-2"
+                      >清理多余空行（最多保留）</label
+                    >
+                    <input
+                      type="number"
+                      id="max-empty-lines"
+                      min="1"
+                      max="10"
+                      value="2"
+                      class="ml-2 w-16 px-2 py-1 border border-gray-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-700"
+                    />
+                    <label for="max-empty-lines" class="ml-1">个连续空行</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 规则组：其他处理 -->
+            <div class="mb-3">
+              <h3 class="font-medium text-primary mb-3 flex items-center">
+                <i class="fa fa-ellipsis-h mr-2 text-sm"></i>7. 其他处理
+              </h3>
+              <div class="space-y-2 pl-6">
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-hr-remove"
+                    class="w-4 h-4 text-primary rounded"
+                    checked
+                  />
+                  <label for="rule-hr-remove" class="ml-2"
+                    >移除分隔线（---、***等）</label
+                  >
+                </div>
+                <div class="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="rule-html-remove"
+                    class="w-4 h-4 text-primary rounded"
+                    checked
+                  />
+                  <label for="rule-html-remove" class="ml-2"
+                    >移除HTML标签</label
+                  >
+                </div>
+              </div>
+            </div>
+
+            <button
+              id="convert-btn"
+              class="w-full mt-2 px-4 py-2.5 bg-primary text-white rounded-lg shadow-sm hover:bg-primary/90 transition-all flex items-center justify-center"
+            >
+              <i class="fa fa-exchange mr-2"></i>
+              应用转换
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 帮助模态框 -->
+    <div
+      id="help-modal"
+      class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300"
+    >
+      <div
+        class="bg-white dark:bg-neutral-800 rounded-xl max-w-2xl w-full max-h-[80vh] overflow-auto m-4 transform scale-95 transition-transform duration-300"
+      >
+        <div
+          class="p-6 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center"
+        >
+          <h3 class="text-xl font-bold">使用帮助</h3>
+          <button
+            id="close-help"
+            class="text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+          >
+            <i class="fa fa-times text-xl"></i>
+          </button>
+        </div>
+        <div class="p-6 space-y-4">
+          <div>
+            <h4 class="font-semibold mb-2">如何使用转换器？</h4>
+            <ol class="list-decimal pl-5 space-y-1">
+              <li>在左侧输入框中粘贴或输入 Markdown 文本</li>
+              <li>根据需要调整转换规则（修改后会自动刷新结果）</li>
+              <li>也可以点击顶部的刷新按钮手动更新转换结果</li>
+              <li>转换后的文本会显示在右侧输出框中</li>
+              <li>点击"复制结果"按钮将文本复制到剪贴板</li>
+            </ol>
+          </div>
+
+          <div>
+            <h4 class="font-semibold mb-2">关于代码块格式</h4>
+            <p class="mb-2">
+              代码块的缩进和格式会被始终保留，不受空白字符清理规则的影响。代码块是指用```包裹的内容。
+            </p>
+          </div>
+
+          <div>
+            <h4 class="font-semibold mb-2">关于加粗与斜体冲突</h4>
+            <p>
+              当启用"优先处理加粗标记"选项时，会先处理**加粗**标记，再处理*斜体*标记，避免两者冲突。
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer
+      class="bg-white dark:bg-neutral-800 border-t border-gray-200 dark:border-neutral-700 py-6 transition-colors duration-300"
+    >
+      <div
+        class="container mx-auto px-4 text-center text-neutral-600 dark:text-neutral-400 text-sm"
+      >
+        <p>Markdown 转 Word 友好文本转换器 &copy; 2025</p>
+        <p class="mt-1">设计用于简化从 Markdown 到 Word 的文本转换流程</p>
+      </div>
+    </footer>
+
+    <script>
+      // DOM 元素
+      const markdownInput = document.getElementById("markdown-input");
+      const wordOutput = document.getElementById("word-output");
+      const convertBtn = document.getElementById("convert-btn");
+      const copyOutputBtn = document.getElementById("copy-output");
+      const copyNotification = document.getElementById("copy-notification");
+      const refreshIndicator = document.getElementById("refresh-indicator");
+      const clearInputBtn = document.getElementById("clear-input");
+      const loadExampleBtn = document.getElementById("load-example");
+      const helpBtn = document.getElementById("help-btn");
+      const helpModal = document.getElementById("help-modal");
+      const closeHelpBtn = document.getElementById("close-help");
+      const themeToggleBtn = document.getElementById("theme-toggle");
+      const refreshBtn = document.getElementById("refresh-btn");
+
+      // 示例 Markdown 文本
+      const exampleMarkdown = `# 会议纪要
+
+**重要提醒：** 请准时参加本次*特别*会议。
+
+## 议程
+
+1. 开场致辞
+   - 欢迎词
+   - 介绍嘉宾
+
+2. 项目汇报
+   - 项目A进展
+   - 项目B计划
+
+查看详情：[项目文档](https://example.com)
+
+> 这是一个引用内容
+> 引用内容的第二行
+
+代码示例：\`print("Hello World")\`
+
+\`\`\`python
+# 这是代码块
+def greet(name):
+    return f"Hello, {name}!"
+
+# 缩进很重要
+if True:
+    print(greet("World"))
+    for i in range(3):
+        print(i)
+\`\`\`
+
+---
+
+## 总结
+- 会议将于周五举行
+- 请提前准备相关材料
+`;
+
+      // 转换规则状态
+      const rules = {
+        headers: {
+          remove: () => document.getElementById("rule-headers-remove").checked,
+          number: () => document.getElementById("rule-headers-number").checked,
+        },
+        emphasis: {
+          remove: () => document.getElementById("rule-remove-emphasis").checked,
+          boldPriority: () =>
+            document.getElementById("rule-bold-italic-priority").checked,
+        },
+        lists: {
+          ulConvert: () => document.getElementById("rule-ul-convert").checked,
+          olConvert: () => document.getElementById("rule-ol-convert").checked,
+          olKeepNumber: () =>
+            document.getElementById("rule-ol-keep-number").checked,
+        },
+        quotes: {
+          remove: () => document.getElementById("rule-quote-remove").checked,
+        },
+        code: {
+          remove: () => document.getElementById("rule-code-remove").checked,
+          removeBlock: () =>
+            document.getElementById("rule-codeblock-remove").checked,
+        },
+        links: {
+          convert: () => document.getElementById("rule-link-convert").checked,
+        },
+        images: {
+          remove: () => document.getElementById("rule-image-remove").checked,
+        },
+        whitespace: {
+          emptyLines: () =>
+            document.getElementById("rule-whitespace-empty-lines").checked,
+          maxEmptyLines: () =>
+            parseInt(document.getElementById("max-empty-lines").value) || 2,
+        },
+        other: {
+          hrRemove: () => document.getElementById("rule-hr-remove").checked,
+          htmlRemove: () => document.getElementById("rule-html-remove").checked,
+        },
+      };
+
+      // 显示刷新指示器
+      function showRefreshIndicator() {
+        refreshIndicator.style.opacity = "1";
+        wordOutput.classList.add("pulse-animation");
+
+        setTimeout(() => {
+          refreshIndicator.style.opacity = "0";
+          wordOutput.classList.remove("pulse-animation");
+        }, 1500);
+      }
+
+      // 处理文本中的空白，保留代码块格式
+      function processWhitespace(text) {
+        // 分割文本为代码块和非代码块部分
+        const parts = [];
+        let inCodeBlock = false;
+        const lines = text.split("\n");
+
+        lines.forEach((line) => {
+          // 检测代码块开始/结束标记
+          const codeMatch = line.trim().match(/^```([\w]*)$/);
+          if (codeMatch) {
+            inCodeBlock = !inCodeBlock;
+            parts.push({ content: line, isCode: false });
+            return;
+          }
+
+          if (inCodeBlock) {
+            // 代码块内的内容保持原样
+            parts.push({ content: line, isCode: true });
+          } else {
+            // 非代码块内容直接添加（其他空白处理已移除）
+            parts.push({ content: line, isCode: false });
+          }
+        });
+
+        // 处理多余空行（只在非代码块区域）
+        if (rules.whitespace.emptyLines()) {
+          const result = [];
+          const maxEmptyLines = rules.whitespace.maxEmptyLines();
+          let emptyLineCount = 0;
+
+          parts.forEach((part) => {
+            if (part.isCode) {
+              // 代码块内容直接添加，重置空行计数
+              result.push(part.content);
+              emptyLineCount = 0;
+            } else {
+              if (part.content.trim() === "") {
+                // 空行处理
+                emptyLineCount++;
+                if (emptyLineCount <= maxEmptyLines) {
+                  result.push(part.content);
+                }
+              } else {
+                // 非空行处理
+                result.push(part.content);
+                emptyLineCount = 0;
+              }
+            }
+          });
+
+          return result.join("\n");
+        }
+
+        return parts.map((part) => part.content).join("\n");
+      }
+
+      // 转换函数
+      function convertMarkdownToWord(markdown) {
+        let result = markdown;
+
+        // 1. 预先识别代码块行号
+        const codeBlockLines = new Set();
+        let inCodeBlock = false;
+        const lines = result.split("\n");
+        lines.forEach((line, index) => {
+          if (/^\s*```/.test(line)) {
+            inCodeBlock = !inCodeBlock;
+            codeBlockLines.add(index);
+          } else if (inCodeBlock) {
+            codeBlockLines.add(index);
+          }
+        });
+
+        // 2. 处理标题
+        if (rules.headers.remove()) {
+          result = result.replace(/#{1,6}\s+/g, "");
+        }
+
+        if (rules.headers.number()) {
+          result = result.replace(/^(\d+)\./gm, "$1、");
+        }
+
+        // 3. 处理强调文本（合并处理加粗和斜体）
+        if (rules.emphasis.remove()) {
+          if (rules.emphasis.boldPriority()) {
+            // 优先处理加粗
+            result = result.replace(/(\*\*|__)(.*?)\1/g, "$2");
+            // 再处理斜体
+            result = result.replace(/(\*|_)(.*?)\1/g, "$2");
+          } else {
+            // 先处理斜体
+            result = result.replace(/(\*|_)(.*?)\1/g, "$2");
+            // 再处理加粗
+            result = result.replace(/(\*\*|__)(.*?)\1/g, "$2");
+          }
+        }
+
+        // 4. 处理列表
+        if (rules.lists.ulConvert()) {
+          result = result.replace(/^[ \t]*[-*+]\s+/gm, "　　");
+        }
+
+        if (rules.lists.olConvert()) {
+          if (rules.lists.olKeepNumber()) {
+            result = result.replace(/^[ \t]*(\d+)\.\s+/gm, "　　$1、");
+          } else {
+            result = result.replace(/^[ \t]*\d+\.\s+/gm, "　　");
+          }
+        }
+
+        // 5. 处理引用
+        if (rules.quotes.remove()) {
+          result = result.replace(/^[ \t]*>\s*/gm, "");
+        }
+
+        // 6. 处理代码
+        if (rules.code.remove()) {
+          result = result.replace(/`/g, "");
+        }
+
+        if (rules.code.removeBlock()) {
+          result = result.replace(/```[\w]*\n/g, "");
+          result = result.replace(/\n```/g, "");
+        }
+
+        // 7. 处理链接
+        if (rules.links.convert()) {
+          result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 [链接: $2]");
+        }
+
+        // 8. 处理图片
+        if (rules.images.remove()) {
+          result = result.replace(
+            /!\[([^\]]*)\]\(([^)]+)\)/g,
+            (match, desc) => {
+              return desc ? `[图片：${desc}]` : "";
+            }
+          );
+        }
+
+        // 9. 处理分隔线
+        if (rules.other.hrRemove()) {
+          result = result.replace(/^[-*_]{3,}\s*$/gm, "");
+        }
+
+        // 10. 处理空白字符
+        result = processWhitespace(result);
+
+        // 11. 移除HTML标签
+        if (rules.other.htmlRemove()) {
+          result = result.replace(/<[^>]*>/g, "");
+        }
+
+        return result;
+      }
+
+      // 应用转换
+      function applyConversion(showIndicator = true) {
+        const markdown = markdownInput.value;
+        const converted = convertMarkdownToWord(markdown);
+        wordOutput.textContent = converted;
+
+        if (showIndicator) {
+          showRefreshIndicator();
+        }
+      }
+
+      // 复制结果到剪贴板
+      function copyToClipboard() {
+        const text = wordOutput.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          copyNotification.style.opacity = "1";
+          setTimeout(() => {
+            copyNotification.style.opacity = "0";
+          }, 2000);
+        });
+      }
+
+      // 事件监听
+      function setupEventListeners() {
+        // 转换按钮
+        convertBtn.addEventListener("click", () => applyConversion());
+
+        // 输入变化时自动转换
+        markdownInput.addEventListener("input", () => applyConversion());
+
+        // 复制按钮
+        copyOutputBtn.addEventListener("click", copyToClipboard);
+
+        // 清空输入
+        clearInputBtn.addEventListener("click", () => {
+          markdownInput.value = "";
+          applyConversion();
+        });
+
+        // 加载示例
+        loadExampleBtn.addEventListener("click", () => {
+          markdownInput.value = exampleMarkdown;
+          applyConversion();
+        });
+
+        // 刷新按钮
+        refreshBtn.addEventListener("click", () => applyConversion());
+
+        // 主题切换
+        themeToggleBtn.addEventListener("click", () => {
+          document.documentElement.classList.toggle("dark");
+          localStorage.setItem(
+            "theme",
+            document.documentElement.classList.contains("dark")
+              ? "dark"
+              : "light"
+          );
+        });
+
+        // 帮助模态框
+        helpBtn.addEventListener("click", () => {
+          helpModal.classList.remove("opacity-0", "pointer-events-none");
+          helpModal.querySelector("div").classList.remove("scale-95");
+          helpModal.querySelector("div").classList.add("scale-100");
+        });
+
+        closeHelpBtn.addEventListener("click", () => {
+          helpModal.classList.add("opacity-0", "pointer-events-none");
+          helpModal.querySelector("div").classList.remove("scale-100");
+          helpModal.querySelector("div").classList.add("scale-95");
+        });
+
+        // 规则变化时自动转换
+        document
+          .querySelectorAll('input[type="checkbox"], input[type="number"]')
+          .forEach((checkbox) => {
+            checkbox.addEventListener("change", () => applyConversion());
+          });
+      }
+
+      // 初始化
+      function init() {
+        // 检查主题偏好
+        if (
+          localStorage.getItem("theme") === "dark" ||
+          (!localStorage.getItem("theme") &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches)
+        ) {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+
+        setupEventListeners();
+        applyConversion(false);
+      }
+
+      // 启动应用
+      init();
+    </script>
+  </body>
+</html>
